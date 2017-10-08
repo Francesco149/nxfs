@@ -30,7 +30,7 @@ is Copyright (C) 2011-2017, Yann Collet.
 
 #define NXFS_VERSION_MAJOR 1
 #define NXFS_VERSION_MINOR 0
-#define NXFS_VERSION_PATCH 0
+#define NXFS_VERSION_PATCH 1
 
 #include <fuse.h>
 #include <fuse_opt.h>
@@ -43,6 +43,18 @@ is Copyright (C) 2011-2017, Yann Collet.
 
 #include <errno.h>
 #include <inttypes.h>
+
+#ifdef __APPLE__
+internalfn
+char* nxfs_strdup(char const* s)
+{
+    char* p = (char*)malloc(strlen(s) + 1);
+    if (p) strcpy(p, s);
+    return p;
+}
+
+#define strdup nxfs_strdup
+#endif
 
 #define internalfn static
 #define global static
