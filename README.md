@@ -38,3 +38,6 @@ ls
 cd
 fusermount -u nxmnt
 ```
+
+the output of ```int64```, ```string```, ```real``` and
+```vector``` values is valid json for easy parsing/reading/dumping
