@@ -1,0 +1,34 @@
+#!/bin/sh
+
+dir=$(dirname $0)
+
+olddir=$(pwd)
+cd $dir
+git pull origin master
+
+echo -e "\nCompiling and Stripping"
+./build "$@" || exit 1
+
+echo -e "\nPackaging"
+folder="nxfs-$(./nxfs -v 2>&1 | grep nxfs | sed 's/nxfs //g')-"
+folder="${folder}$(gcc -dumpmachine)"
+
+mkdir -p "$folder"
+mv ./nxfs $folder/nxfs
+git archive HEAD --prefix=src/ -o "$folder"/src.tar
+cd "$folder"
+tar xf src.tar
+cd ..
+
+rm "$folder".tar.xz
+tar -cvJf "$folder".tar.xz \
+    "$folder"/nxfs \
+    "$folder"/src
+
+echo -e "\nResult:"
+tar tf "$folder".tar.xz
+
+rm -rf "$folder"
+
+cd $olddir
+
