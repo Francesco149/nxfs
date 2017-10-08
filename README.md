@@ -5,9 +5,6 @@ read-only fuse filesystem for the
 [tinynx](https://github.com/Francesco149/tinynx)
 
 ![](https://media.giphy.com/media/l1J9RfALTYXacQSDm/giphy.gif)
-
-![](https://media.giphy.com/media/3ohhwJTUQUFproE59u/giphy.gif)
-
 ![](https://media.giphy.com/media/3ohhwlI8GR9Qux9cCk/giphy.gif)
 
 [video demonstration](https://streamable.com/7s4wl)
