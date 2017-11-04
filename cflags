@@ -1,6 +1,6 @@
 #!/bin/sh
 
-cflags="-std=c89 -fdiagnostics-color=always"
+cflags="-std=c89"
 cflags="$cflags -O3"
 cflags="$cflags -Wno-variadic-macros -Wno-long-long -Wall"
 cflags="$cflags -Wconversion -Wno-unused-result"
