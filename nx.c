@@ -73,8 +73,8 @@ define toggles:
         implemented)                                             */
 
 #define NX_VERSION_MAJOR 1
-#define NX_VERSION_MINOR 0
-#define NX_VERSION_PATCH 3
+#define NX_VERSION_MINOR 2
+#define NX_VERSION_PATCH 2
 
 #ifndef NX_NOSTDINT
 #include <stdint.h>
@@ -180,6 +180,10 @@ series of node names. returns 0 on success and < 0 on failure */
 nxapi int32_t nx_get(struct nx_file* f, char const* path,
     struct nx_node* node);
 
+/* same as nx_get but starts from node with id parent_id */
+nxapi int32_t nx_get_p(struct nx_file* f, char const* path,
+    uint32_t parent_id, struct nx_node* node);
+
 #define NX_NONE 0
 #define NX_INT64 1
 #define NX_REAL 2
@@ -242,23 +246,44 @@ char const* nx_errstr(int32_t err)
 
 internalfn
 uint16_t read2(uint8_t const* p) {
-    return (uint16_t)p[0] | ((uint16_t)p[1] << 8);
+    return (uint16_t)(p[0] | p[1] << 8);
+}
+
+internalfn
+int32_t read2p(uint8_t const* p, uint16_t* pvalue)
+{
+    *pvalue = read2(p);
+    return 2;
 }
 
 internalfn
 uint32_t read4(uint8_t const* p)
 {
-    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) |
-        ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+    return (uint32_t)(p[0] | p[1] << 8 |
+        p[2] << 16 | p[3] << 24);
+}
+
+internalfn
+int32_t read4p(uint8_t const* p, uint32_t* pvalue)
+{
+    *pvalue = read4(p);
+    return 4;
 }
 
 internalfn
 uint64_t read8(uint8_t const* p)
 {
-    return (uint64_t)p[0] | ((uint64_t)p[1] << 8) |
-        ((uint64_t)p[2] << 16) | ((uint64_t)p[3] << 24) |
-        ((uint64_t)p[4] << 32) | ((uint64_t)p[5] << 40) |
-        ((uint64_t)p[6] << 48) | ((uint64_t)p[7] << 56);
+    return (uint64_t)p[0] | (uint64_t)p[1] << 8 |
+        (uint64_t)p[2] << 16 | (uint64_t)p[3] << 24 |
+        (uint64_t)p[4] << 32 | (uint64_t)p[5] << 40 |
+        (uint64_t)p[6] << 48 | (uint64_t)p[7] << 56;
+}
+
+internalfn
+int32_t read8p(uint8_t const* p, uint64_t* pvalue)
+{
+    *pvalue = read8(p);
+    return 8;
 }
 
 internalfn
@@ -267,6 +292,13 @@ double read_double(uint8_t const* p)
     uint64_t v = read8(p);
     double* pd = (double*)&v;
     return *pd;
+}
+
+internalfn
+int32_t read_double_p(uint8_t const* p, double* pvalue)
+{
+    *pvalue = read_double(p);
+    return 8;
 }
 
 /* ------------------------------------------------------------- */
@@ -317,7 +349,7 @@ void LZ4_wild_copy(void* dstptr, void const* srcptr, void* dstend)
 
 internalfn
 int LZ4_decompress_safe(char const* src,
-    char* dst, int src_size, int output_size)
+    char* dst, uint32_t src_size, uint32_t output_size)
 {
     uint8_t const* ip = (uint8_t const*) src;
     uint8_t const* const iend = ip + src_size;
@@ -560,13 +592,15 @@ int32_t os_mmap(struct os_mapping* m, char const* path)
         return NX_EIO;
     }
 
-    m->base = mmap(0, st.st_size, PROT_READ, MAP_SHARED, m->fd, 0);
+    m->base = mmap(0, (size_t)st.st_size, PROT_READ, MAP_SHARED,
+        m->fd, 0);
+
     if (m->base == (void*)-1) {
         perror("mmap");
         return NX_EIO;
     }
 
-    m->size = st.st_size;
+    m->size = (uint64_t)st.st_size;
 
     return 0;
 }
@@ -614,14 +648,14 @@ int32_t nx_map(struct nx_file* f, char const* path)
 
     p += 4;
 
-    f->nnodes = read4(p), p += 4;
-    f->nodes_offset = read8(p), p += 8;
-    f->nstrings = read4(p), p += 4;
-    f->strings_offset = read8(p), p += 8;
-    f->nbitmaps = read4(p), p += 4;
-    f->bitmaps_offset = read8(p), p += 8;
-    f->naudio = read4(p), p += 4;
-    f->audio_offset = read8(p), p += 8;
+    p += read4p(p, &f->nnodes);
+    p += read8p(p, &f->nodes_offset);
+    p += read4p(p, &f->nstrings);
+    p += read8p(p, &f->strings_offset);
+    p += read4p(p, &f->nbitmaps);
+    p += read8p(p, &f->bitmaps_offset);
+    p += read4p(p, &f->naudio);
+    p += read8p(p, &f->audio_offset);
 
     if (f->nodes_offset + f->nnodes * NX_NODE_SIZE > f->map.size ||
         f->strings_offset + f->nstrings * 8 > f->map.size ||
@@ -672,10 +706,10 @@ int32_t nx_node_at(struct nx_file* f, uint32_t id,
     p += f->nodes_offset + id * NX_NODE_SIZE;
 
     node->id = id;
-    node->name_id = read4(p); p += 4;
-    node->first_child_id = read4(p); p += 4;
-    node->nchildren = read2(p); p += 2;
-    node->type = read2(p); p += 2;
+    p += read4p(p, &node->name_id);
+    p += read4p(p, &node->first_child_id);
+    p += read2p(p, &node->nchildren);
+    p += read2p(p, &node->type);
     node->data = p;
 
     return 0;
@@ -697,7 +731,8 @@ int32_t nx_string_at_n(struct nx_file* f, uint32_t id, char* buf,
     p += f->strings_offset + id * 8;
     p = (uint8_t const*)f->map.base + read8(p);
 
-    len = mymin(bufsize - 1, read2(p)); p += 2;
+    p += read2p(p, &len);
+    len = mymin((uint16_t)(bufsize - 1), len);
     memcpy(buf, p, len);
     buf[len] = 0;
 
@@ -719,7 +754,7 @@ int32_t nx_string_at(struct nx_file* f, uint32_t id, char* buf)
     p += f->strings_offset + id * 8;
     p = (uint8_t const*)f->map.base + read8(p);
 
-    len = read2(p); p += 2;
+    p += read2p(p, &len);
     memcpy(buf, p, len);
     buf[len] = 0;
 
@@ -744,9 +779,9 @@ int32_t nx_bitmap_at(struct nx_file* f, uint32_t id, uint8_t* buf,
     p += f->bitmaps_offset + id * 8;
     p = (uint8_t const*)f->map.base + read8(p);
 
-    compressed_len = read4(p); p += 4;
+    p += read4p(p, &compressed_len);
     result = LZ4_decompress_safe((char const*)p, (char*)buf,
-        compressed_len, bufsize);
+        compressed_len, (uint32_t)bufsize);
     if (result < 0) {
         info("LZ4_decompress_safe failed with %d\n", result);
         return NX_EFORMAT;
@@ -826,10 +861,17 @@ nxapi
 int32_t nx_get(struct nx_file* f, char const* path,
     struct nx_node* node)
 {
+    return nx_get_p(f, path, 0, node);
+}
+
+nxapi
+int32_t nx_get_p(struct nx_file* f, char const* path,
+    uint32_t parent_id, struct nx_node* node)
+{
     int32_t res;
     struct nx_bsearch search;
 
-    res = nx_node_at(f, 0, node);
+    res = nx_node_at(f, parent_id, node);
     if (res < 0) {
         return res;
     }
