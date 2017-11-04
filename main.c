@@ -30,7 +30,7 @@ is Copyright (C) 2011-2017, Yann Collet.
 
 #define NXFS_VERSION_MAJOR 1
 #define NXFS_VERSION_MINOR 0
-#define NXFS_VERSION_PATCH 3
+#define NXFS_VERSION_PATCH 4
 
 #include <fuse.h>
 #include <fuse_opt.h>
