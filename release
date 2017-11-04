@@ -6,10 +6,12 @@ olddir=$(pwd)
 cd $dir
 git pull origin master
 
-echo -e "\nCompiling and Stripping"
+echo ""
+echo "Compiling and Stripping"
 ./build "$@" || exit 1
 
-echo -e "\nPackaging"
+echo ""
+echo "Packaging"
 folder="nxfs-$(./nxfs -v 2>&1 | grep nxfs | sed 's/nxfs //g')-"
 folder="${folder}$(gcc -dumpmachine)"
 
@@ -25,7 +27,8 @@ tar -cvJf "$folder".tar.xz \
     "$folder"/nxfs \
     "$folder"/src
 
-echo -e "\nResult:"
+echo ""
+echo "Result:"
 tar tf "$folder".tar.xz
 
 rm -rf "$folder"
