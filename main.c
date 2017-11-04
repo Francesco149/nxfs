@@ -30,7 +30,7 @@ is Copyright (C) 2011-2017, Yann Collet.
 
 #define NXFS_VERSION_MAJOR 1
 #define NXFS_VERSION_MINOR 0
-#define NXFS_VERSION_PATCH 1
+#define NXFS_VERSION_PATCH 2
 
 #include <fuse.h>
 #include <fuse_opt.h>
@@ -187,7 +187,7 @@ int nxfs_getattr(char const* path, struct stat* st)
         }
 
         json_string(jsonbuf, buf);
-        st->st_size = strlen(jsonbuf);
+        st->st_size = (off_t)strlen(jsonbuf);
         break;
     }
 
@@ -210,7 +210,7 @@ int nxfs_getattr(char const* path, struct stat* st)
     {
         char buf[0x10000];
         json_integer(buf, node.type, node.data);
-        st->st_size = strlen(buf);
+        st->st_size = (off_t)strlen(buf);
         break;
     }
 
@@ -342,9 +342,10 @@ int nxfs_read(char const* path, char* dst, size_t size_,
 
         json_string(jsonbuf, buf);
 
-        res = mymin(strlen(jsonbuf) - offset, size);
+        res = (int32_t)mymin(
+            (int64_t)(strlen(jsonbuf) - (size_t)offset), size);
         if (res > 0) {
-            memcpy(dst, jsonbuf + offset, res);
+            memcpy(dst, jsonbuf + offset, (size_t)res);
         } else {
             res = 0;
         }
@@ -359,9 +360,10 @@ int nxfs_read(char const* path, char* dst, size_t size_,
         uint16_t height = read2(node.data + 6);
         uint8_t header[14 + 40 + 4 * 4];
         uint8_t* p;
-        int32_t uncompressed_size = width * height * 4;
+        uint32_t uncompressed_size =
+            (uint32_t)(width * height * 4);
         uint8_t* pixels = 0;
-        int32_t to_copy;
+        int64_t to_copy;
 
         /* bfType = BM (windblows) */
         p = header;
@@ -399,19 +401,20 @@ int nxfs_read(char const* path, char* dst, size_t size_,
 
         if (offset < sizeof(header))
         {
-            to_copy = mymin(size, sizeof(header) - offset);
+            to_copy = mymin(size,
+                (int64_t)sizeof(header) - offset);
             if (to_copy > 0)
             {
-                memcpy(dst, header + offset, to_copy);
+                memcpy(dst, header + offset, (size_t)to_copy);
                 size -= to_copy;
                 offset = 0;
                 dst += to_copy;
-                res += to_copy;
+                res += (int32_t)to_copy;
             }
         }
 
         else {
-            offset -= sizeof(header);
+            offset -= (off_t)sizeof(header);
         }
 
         /* TODO: allow partial reads of the bitmap to save mem */
@@ -423,15 +426,15 @@ int nxfs_read(char const* path, char* dst, size_t size_,
 
             pixels = (uint8_t*)malloc(uncompressed_size);
             result = nx_bitmap_at(&nx, read4(node.data), pixels,
-                uncompressed_size);
+                (int32_t)uncompressed_size);
             if (result < 0) {
                 res = result;
                 goto bmp_cleanup;
             }
 
             if (to_copy > 0) {
-                memcpy(dst, pixels + offset, to_copy);
-                res += to_copy;
+                memcpy(dst, pixels + offset, (size_t)to_copy);
+                res += (int32_t)to_copy;
             }
         }
 
@@ -461,9 +464,10 @@ bmp_cleanup:
             }
         }
 
-        res = mymin(read4(node.data + 4) - offset, size);
+        res = mymin((int32_t)(read4(node.data + 4) - offset),
+            (int32_t)size);
         if (res > 0) {
-            memcpy(dst, raw_audio + offset, res);
+            memcpy(dst, raw_audio + offset, (size_t)res);
         } else {
             res = 0;
         }
@@ -478,9 +482,10 @@ bmp_cleanup:
         char buf[0x10000];
         json_integer(buf, node.type, node.data);
 
-        res = mymin(strlen(buf) - offset, size);
+        res = mymin((int32_t)strlen(buf) - (int32_t)offset,
+            (int32_t)size);
         if (res > 0) {
-            memcpy(dst, buf + offset, res);
+            memcpy(dst, buf + offset, (size_t)res);
         } else {
             res = 0;
         }
@@ -488,9 +493,9 @@ bmp_cleanup:
     }
 
     default:
-        res = mymin(8 - offset, size);
+        res = mymin(8 - (int32_t)offset, (int32_t)size);
         if (res > 0) {
-            memcpy(dst, node.data + offset, res);
+            memcpy(dst, node.data + offset, (size_t)res);
         } else {
             res = 0;
         }
